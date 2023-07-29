@@ -27,4 +27,4 @@ In addition to expert training and hands-on projects, you'll complete a case stu
 * [Share Data Through the Art of Visualization](https://www.coursera.org/programs/santa-clara-city-library-sngre/learn/visualize-data?specialization=google-data-analytics)
 * [Data Analysis with R Programming](https://www.coursera.org/programs/santa-clara-city-library-sngre/learn/data-analysis-r?specialization=google-data-analytics)
 * [Google Data Analytics Capstone: Complete a Case Study](https://www.coursera.org/programs/santa-clara-city-library-sngre/learn/google-data-analytics-capstone?specialization=google-data-analytics)
-[]()
+![](https://github.com/yanshao113/Google-data-analytics/blob/main/Google%20Data%20Analytics_%20Coursera.jpg)
