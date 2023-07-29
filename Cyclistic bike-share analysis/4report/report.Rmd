@@ -1,0 +1,316 @@
+---
+title: "Cyclistic bike-share analysis"
+author: "Yan Shao"
+date: "2023-07-26"
+output: html_document
+---
+
+# Introduction
+
+## Scenario
+
+You are a junior data analyst working in the marketing analyst team at Cyclistic, a bike-share company in Chicago. The director of marketing believes the company's future success depends on maximizing the number of annual memberships. Therefore, your team wants to understand **how casual riders and annual members use Cyclistic bikes differently**. From these insights, your team will design a new marketing strategy to **convert casual riders into annual members**. But first, Cyclistic executives must approve your recommendations, so they must be backed up with compelling data insights and professional data visualizations.
+
+## About the company
+
+In 2016, Cyclistic launched a successful bike-share offering. Since then, the program has grown to a fleet of 5,824 bicycles that are geotracked and locked into a network of 692 stations across Chicago. The bikes can be unlocked from one station and returned to any other station in the system anytime. Until now, Cyclistic's marketing strategy relied on building general awareness and appealing to broad consumer segments. One approach that helped make these things possible was the flexibility of its pricing plans: **single-ride passes, full-day passes, and annual memberships**. Customers who purchase single-ride or full-day passes are referred to as casual riders. Customers who purchase annual memberships are Cyclistic members.
+
+## Data source
+
+I downloaded 12 months of Cyclistic's historical trip data(July 2022 - June 2023) from [here](https://divvy-tripdata.s3.amazonaws.com/index.html).The data has been made available by Motivate International Inc. under this [license](https://ride.divvybikes.com/data-license-agreement).
+
+## Tool
+
+-   **Rstudio**
+-   **Tableau**
+-   **Github**
+
+# Business Task
+
+-   Understand how annual members and casual riders differ.
+-   Convert casual riders into annual members.
+
+# Process
+
+```{r set environment}
+##install.packages("DT") ## show datatable
+## loading the packages
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(lubridate)
+library(DT)
+```
+
+## 1. Importing individual CSV files
+
+I have stored the previous 12 months of Cyclistic trip data in the folder "original_data_202207_2023_06". When I read the data file, I need add a folder name before the file name as writing codes.
+
+```{r message=FALSE}
+jul202207_df<-read_csv("0original_data_202207_2023_06/202207-divvy-tripdata.csv")
+aug202208_df<-read_csv("0original_data_202207_2023_06/202208-divvy-tripdata.csv")
+sep202209_df<-read_csv("0original_data_202207_2023_06/202209-divvy-tripdata.csv")
+oct202210_df<-read_csv("0original_data_202207_2023_06/202210-divvy-tripdata.csv")
+nov202211_df<-read_csv("0original_data_202207_2023_06/202211-divvy-tripdata.csv")
+dec202212_df<-read_csv("0original_data_202207_2023_06/202212-divvy-tripdata.csv")
+jan202301_df<-read_csv("0original_data_202207_2023_06/202301-divvy-tripdata.csv")
+feb202302_df<-read_csv("0original_data_202207_2023_06/202302-divvy-tripdata.csv")
+mar202303_df<-read_csv("0original_data_202207_2023_06/202303-divvy-tripdata.csv")
+apr202304_df<-read_csv("0original_data_202207_2023_06/202304-divvy-tripdata.csv")
+may202305_df<-read_csv("0original_data_202207_2023_06/202305-divvy-tripdata.csv")
+jun202306_df<-read_csv("0original_data_202207_2023_06/202306-divvy-tripdata.csv")
+```
+
+## 2. Merging into one-year dataset
+
+```{r}
+cyclistic_year_df<-bind_rows(jul202207_df,aug202208_df,sep202209_df,oct202210_df,nov202211_df,dec202212_df,jan202301_df,feb202302_df,mar202303_df,apr202304_df,may202305_df,jun202306_df)
+```
+
+```{r}
+summary(cyclistic_year_df)
+```
+
+## 3. Cleaning
+
+### a. selecting some useful columns and creating a new data frame to protect original data
+
+```{r}
+cyclistic_df <- cyclistic_year_df %>% 
+  select(member_casual,rideable_type,started_at,ended_at,start_lat,start_lng,end_lat,end_lng)
+```
+
+### b. removing rows without values
+
+```{r}
+cyclistic_df <- cyclistic_df%>% drop_na() 
+```
+
+### c. separating data time to calculate ride length(minutes)
+
+```{r}
+cyclistic_df <- cyclistic_df %>% 
+  mutate(started_date = as.Date(started_at),weekday = wday(started_date,label=TRUE), ride_length_mins = as.numeric(difftime(ended_at,started_at,units="mins")))
+```
+
+### d.filtering out error value
+
+such as negative value in the ride length column and zero in the end latitude column.
+
+```{r}
+cyclistic_df <- cyclistic_df %>% filter(ride_length_mins>0 & end_lat != 0)
+```
+
+```{r}
+head(cyclistic_df)
+```
+
+### e. further removing outliers
+
+> ![code:hist(log(cyclistic_df\$ride_length_mins,base=10))](2visualization/Rstudio%20plot%20image/distribution_rideduration%3E0.png)
+
+Depending on the plot, data mainly fall in the range between 0 and 2. So I cut off the value less than 1 minute. But I thought that some values that are greater than 100 minutes may be meaningful. I used the filter function to browse the current data set. ![code shown below](3code documentation/Rstudio code screenshot/filter range code.png)
+
+The data showed that only casual riders provided ride length that is more than 1500 minutes. So these values could not help me understand the difference between casual rides and members.
+
+```{r cut off ride_length_mins <1, and ride_length_mins >1500}
+cyclistic_df <- cyclistic_df %>% filter(ride_length_mins<1500 & ride_length_mins > 1)
+```
+
+```{r summary cleaned data}
+summary(cyclistic_df)
+```
+
+### f. exporting the dataframe as a .CSV file
+
+> write.csv(cyclistic_df,"/Users/shaoyan/Cyclistic bike-share analysis/cyclistic_data_cleaned.csv")
+
+## 4. Analysis
+
+> ***Descriptive analysis on ride_length***
+
+```{r straight average (total ride length / rides)}
+mean(cyclistic_df$ride_length_mins)
+```
+
+```{r midpoint number in the ascending array of ride lengths}
+median(cyclistic_df$ride_length_mins) 
+```
+
+```{r longest ride}
+max(cyclistic_df$ride_length_mins) 
+```
+
+```{r shortest ride}
+min(cyclistic_df$ride_length_mins) 
+```
+
+> ***Compare members and casual users***
+
+```{r average ride length vs member type}
+aggregate(cyclistic_df$ride_length_mins ~ cyclistic_df$member_casual, FUN = mean)
+```
+
+```{r median ride length vs member type}
+aggregate(cyclistic_df$ride_length_mins ~ cyclistic_df$member_casual, FUN = median)
+```
+
+```{r max ride length vs member type}
+aggregate(cyclistic_df$ride_length_mins ~ cyclistic_df$member_casual, FUN = max)
+```
+
+```{r min ride length vs member type}
+aggregate(cyclistic_df$ride_length_mins ~ cyclistic_df$member_casual, FUN = min)
+```
+
+> \# rider trip data by member type and weekday
+>
+> \# the average ride time by the days of the week for members vs casual riders
+>
+> cyclistic_df\$weekday \<- ordered(cyclistic_df\$weekday, levels=c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat","Sun")) aggregate(cyclistic_df\$ride_length_mins \~ cyclistic_df\$member_casual + cyclistic_df\$weekday, FUN = mean)
+
+> |     | member_casual | weekday | ride_length_mins |
+> |-----|---------------|---------|------------------|
+> | 1   | casual        | Mon     | 20.73156         |
+> | 2   | member        | Mon     | 11.80401         |
+> | 3   | casual        | Tue     | 18.54757         |
+> | 4   | member        | Tue     | 11.79966         |
+> | 5   | casual        | Wed     | 18.10039         |
+> | 6   | member        | Wed     | 11.86181         |
+> | 7   | casual        | Thu     | 18.41410         |
+> | 8   | member        | Thu     | 11.93120         |
+> | 9   | casual        | Fri     | 20.22454         |
+> | 10  | member        | Fri     | 12.28835         |
+> | 11  | casual        | Sat     | 23.88718         |
+> | 12  | member        | Sat     | 13.90373         |
+> | 13  | casual        | Sun     | 24.05058         |
+> | 14  | member        | Sun     | 13.68963         |
+
+The data result tells me that most casual riders had the longer trips. Most riders use the service for short trips that last around 13 minutes. During weekend, casual riders would have longer ride length. On the other hand, members have more consistent ride length.
+
+# Share
+
+## visualization
+
+### 1.ggplot
+
+> ***the number of rides by member type by the start month***
+
+```{r}
+cyclistic_df %>% mutate(start_month = month(as.Date(started_at))) %>% 
+  group_by(member_casual, start_month) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length_mins)) %>% 
+  arrange(member_casual, start_month)  %>% 
+  ggplot(aes(x = start_month, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge")+scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12))
+```
+
+Most users prefer using bike-share service for longer periods from June to September. It might relate to to warm climate during the months of the year. The number of rides of casual riders visibly dropped from November to February than members.
+
+> ***the number of rides by member type by the rideable type***
+
+```{r}
+cyclistic_df %>% 
+  group_by(member_casual, rideable_type) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length_mins)) %>% 
+  arrange(member_casual, rideable_type)  %>%  
+  ggplot(aes(x = rideable_type, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge")
+```
+
+It is very interesting. The bar char shows that members during the year did not use the docked bike. For casual rides, they use more class bikes or electric bikes than docked bikes.
+
+> The number of rides by member types
+
+```{r}
+cyclistic_df %>% 
+  group_by(member_casual) %>% 
+  summarise(number_of_rides = n()) %>% 
+  ggplot(aes(x = "", y = number_of_rides, fill = member_casual)) +geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(label = paste0(number_of_rides)), position = position_stack(vjust=0.5)) +
+  labs(x = NULL, y = NULL, fill = NULL)
+```
+
+```{r}
+cyclistic_df %>% 
+  group_by(member_casual) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length_mins)) %>% 
+  ggplot(aes(x = "", y = average_duration, fill = member_casual)) +geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(label = paste0(average_duration)), position = position_stack(vjust=0.5)) +
+  labs(x = NULL, y = NULL, fill = NULL)
+```
+
+As shown above, member made much more trips which lasted short. On the other hand, casual riders are more likely to spend longer time in each trip.
+
+### 2.Tableau
+
+> ***Average ride length by week day***
+
+![](Average ride length by weekday.png)
+
+Here, the bar char shows that casual riders had significantly longer average trip length than members. Besides, casual rides used the service longer average trip length during weekend. On the other hand, the average trip length of members did not change obviously. It probably depends on the type of usage. For instance, casual users use it for leisure and members use it for commute.
+
+> ***Average ride length by the start month***
+
+![](Average ride length by the start month.png)
+
+Most users prefer using bike-share service for longer periods from June to September. It might relate to to warm climate during the months of the year. The number of rides of casual riders visibly dropped from November to February than members.
+
+> ***Ride length by Hour***
+
+![](2visualization/Tableau%20plot/Ride%20length%20by%20Hour.png)
+
+Based on the ride length by hour graph, there are two peak in 8 am and 17 pm in the member curve. It might be the timings of commute.
+
+> ***Popular start & end stations by member type***
+
+![](2visualization/Tableau%20plot/map.png)
+
+For members, the popular start stations(dark red dots) are distributed dispersively. However, the popular start station of casual users merely are located near coastline. So the casual riders might ride for leisure activities or sightseeing.
+
+> # Conclusion
+
+In the project, I mainly focused on identifying if there are the day of the week, the peak usage hour, ride length, and location, which may contribute to the difference between members and casual users. During the process, I used different tools.
+
+-   R
+
+    -   read, merge data
+
+    -   clean data
+
+    -   plot
+
+    -   make report
+
+-   [Tableau](https://public.tableau.com/app/profile/yan.shao/viz/GoogleCapstoneProjectVersion1_Cyclisticbike-shareanalysis/RidelengthbyHour)
+
+    -   plot
+
+    -   create dashboard
+
+    -   share result
+
+-   [Github](https://github.com/yanshao113/Google-data-analytics)
+
+    -   store material
+
+    -   share result
+
+Based on these plots, I find some key points:
+
+1.  Most casual riders had longer trips on average than Members.
+
+2.  Most casual riders used the service less frequent than Members.
+
+3.  Most casual riders rode on weekends. But most Members used the service over week.
+
+4.  Most casual riders preferred using classic or electric bikes but only casual riders used docked bikes.
+
+5.  Most members rode intensively at 8 am and 17 pm. They probably ride for commuting.
+
+6.  The popular start and end locations for casual riders are located near coastline.
