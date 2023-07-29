@@ -1,0 +1,20 @@
+---
+title: "Sample"
+author: "Yan"
+date: "2023-07-26"
+output: html_document
+---
+
+```{r ggplot for penguin data, message=TRUE, paged.print=FALSE}
+library(ggplot2)
+library(palmerpenguins)
+library(DT)
+data("penguins")
+datatable(penguins)
+```
+```{r ggplot for penguin data visulization, warning=FALSE}
+ggplot(data=penguins)+geom_point(mapping = aes(x=flipper_length_mm,y=body_mass_g))
+
+```
+
+
